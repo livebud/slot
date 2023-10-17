@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"strings"
 	"testing"
 
 	"github.com/livebud/slot"
@@ -14,25 +16,25 @@ import (
 func TestChainMainSlot(t *testing.T) {
 	is := is.New(t)
 	view := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<view>%s</view>", slot)
 	})
 	frame1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<frame1>%s</frame1>", slot)
 	})
 	frame2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<frame2>%s</frame2>", slot)
 	})
 	layout := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<layout>%s</layout>", slot)
@@ -51,25 +53,25 @@ func TestChainMainSlot(t *testing.T) {
 func TestBatchMainSlot(t *testing.T) {
 	is := is.New(t)
 	view := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<view>%s</view>", slot)
 	})
 	frame1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<frame1>%s</frame1>", slot)
 	})
 	frame2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<frame2>%s</frame2>", slot)
 	})
 	layout := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<layout>%s</layout>", slot)
@@ -88,7 +90,7 @@ func TestBatchMainSlot(t *testing.T) {
 func TestChainOtherSlots(t *testing.T) {
 	is := is.New(t)
 	view := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		script := slots.Slot("script")
 		err := script.WriteString(`<script src='module.js'></script>`)
 		is.NoErr(err)
@@ -97,19 +99,19 @@ func TestChainOtherSlots(t *testing.T) {
 		fmt.Fprintf(w, "<view>%s</view>", slot)
 	})
 	frame1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<frame1>%s</frame1>", slot)
 	})
 	frame2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<frame2>%s</frame2>", slot)
 	})
 	layout := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		script, err := slots.Slot("script").ReadString()
 		is.NoErr(err)
 		slot, err := slots.ReadString()
@@ -130,7 +132,7 @@ func TestChainOtherSlots(t *testing.T) {
 func TestBatchOtherSlots(t *testing.T) {
 	is := is.New(t)
 	view := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		w.Header().Set("aa", "aa")
 		script := slots.Slot("script")
 		err := script.WriteString(`<script src='module.js'></script>`)
@@ -140,14 +142,14 @@ func TestBatchOtherSlots(t *testing.T) {
 		fmt.Fprintf(w, "<view>%s</view>", slot)
 	})
 	frame1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		w.Header().Set("bb", "bb")
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		fmt.Fprintf(w, "<frame1>%s</frame1>", slot)
 	})
 	frame2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		err = slots.Slot("style").WriteString(`<link href='/hi.css'/>`)
@@ -156,7 +158,7 @@ func TestBatchOtherSlots(t *testing.T) {
 		fmt.Fprintf(w, "<frame2>%s</frame2>", slot)
 	})
 	layout := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slots := slot.New(w, r)
+		slots := slot.Open(w, r)
 		slot, err := slots.ReadString()
 		is.NoErr(err)
 		script, err := slots.Slot("script").ReadString()
@@ -177,4 +179,74 @@ func TestBatchOtherSlots(t *testing.T) {
 	headers := res.Header
 	is.Equal(headers.Get("aa"), "aa")
 	is.Equal(headers.Get("bb"), "bb")
+}
+
+func ExampleBatch() {
+	view := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slots := slot.Open(w, r)
+		w.Header().Set("Content-Type", "text/html")
+		script := slots.Slot("script")
+		script.WriteString(`<script src='/index.js'></script>`)
+		slot, err := slots.ReadString()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprintf(w, "<h1>%s</h1>", slot)
+	})
+	frame := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slots := slot.Open(w, r)
+		slot, err := slots.ReadString()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		slots.Slot("style").WriteString(`<link href='/frame.css'/>`)
+		fmt.Fprintf(w, "<main>\n\t\t\t%s\n\t\t</main>", slot)
+	})
+	layout := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slots := slot.Open(w, r)
+		slot, err := slots.ReadString()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		script, err := slots.Slot("script").ReadString()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		style, err := slots.Slot("style").ReadString()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprintf(w, "<html>\n\t<head>\n\t\t%s\n\t\t%s\n\t</head>\n\t<body>\n\t\t%s\n\t</body>\n</html>", script, style, slot)
+	})
+	handler := slot.Batch(view, frame, layout)
+	req := httptest.NewRequest("GET", "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	res := rec.Result()
+	response, err := httputil.DumpResponse(res, true)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(strings.ReplaceAll(string(response), "\r\n", "\n"))
+	// Output:
+	// HTTP/1.1 200 OK
+	// Connection: close
+	// Content-Type: text/html
+	//
+	// <html>
+	// 	<head>
+	// 		<script src='/index.js'></script>
+	// 		<link href='/frame.css'/>
+	// 	</head>
+	// 	<body>
+	// 		<main>
+	// 			<h1></h1>
+	// 		</main>
+	// 	</body>
+	// </html>
 }

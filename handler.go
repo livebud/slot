@@ -22,7 +22,7 @@ func Chain(handlers ...http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Write([]byte(state.Main))
+		w.Write([]byte(state.Data))
 	})
 }
 
@@ -51,6 +51,6 @@ func Batch(handlers ...http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Write([]byte(state.Main))
+		w.Write([]byte(state.Data))
 	})
 }

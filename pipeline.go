@@ -12,7 +12,7 @@ func newPipeline(rw http.ResponseWriter) *pipeline {
 	return &pipeline{
 		rw: rw,
 		state: &state{
-			Others: map[string]string{},
+			Named: map[string]string{},
 		},
 		headers: http.Header{},
 		reader:  bytes.NewBuffer(nil),
@@ -41,12 +41,12 @@ func (pl *pipeline) WriteHeader(statusCode int) {
 }
 
 func (pl *pipeline) Write(p []byte) (n int, err error) {
-	pl.state.Main += string(p)
+	pl.state.Data += string(p)
 	return len(p), nil
 }
 
 func (pl *pipeline) WriteTo(slot string, p []byte) (n int, err error) {
-	pl.state.Others[slot] += string(p)
+	pl.state.Named[slot] += string(p)
 	return len(p), nil
 }
 
@@ -78,7 +78,7 @@ func (pl *pipeline) Next() *pipeline {
 	return &pipeline{
 		rw: pl.rw,
 		state: &state{
-			Others: pl.state.Others,
+			Named: pl.state.Named,
 		},
 		// Fresh set of headers to support concurrency
 		headers: http.Header{},

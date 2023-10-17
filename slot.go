@@ -8,8 +8,9 @@ import (
 	"sync"
 )
 
-func New(w http.ResponseWriter, r *http.Request) *Slots {
-	return &Slots{
+// Open slots for reading and writing
+func Open(w http.ResponseWriter, r *http.Request) *slots {
+	return &slots{
 		w: w,
 		r: r,
 	}
@@ -28,21 +29,35 @@ func (o *once) Do(fn func() (*state, error)) (*state, error) {
 	return o.state, o.err
 }
 
-type Slots struct {
-	w http.ResponseWriter
-	r *http.Request
-
-	once  once
-	state *state
+// NamedSlot is a single read-writable slot
+type NamedSlot interface {
+	ReadString() (string, error)
+	WriteString(string) error
 }
 
+// Slots contains a single readable default slot and a map of named slots
+type Slots interface {
+	ReadString() (string, error)
+	Slot(slot string) NamedSlot
+}
+
+type slots struct {
+	w    http.ResponseWriter
+	r    *http.Request
+	once once
+}
+
+var _ Slots = (*slots)(nil)
+
+// State of the slots. This data structure may change, so don't rely on this
+// structure in your app.
 type state struct {
-	Main   string
-	Others map[string]string
+	Data  string            `json:"data"`
+	Named map[string]string `json:"named"`
 }
 
 var emptyState = &state{
-	Others: map[string]string{},
+	Named: map[string]string{},
 }
 
 func readState(r io.Reader) (*state, error) {
@@ -59,47 +74,49 @@ func readState(r io.Reader) (*state, error) {
 	return &state, nil
 }
 
-func (s *Slots) readState() (*state, error) {
+func (s *slots) readState() (*state, error) {
 	return s.once.Do(func() (*state, error) {
 		return readState(s.r.Body)
 	})
 }
 
-func (s *Slots) Slot(slot string) *Slot {
-	return &Slot{
+func (s *slots) Slot(name string) NamedSlot {
+	return &namedSlot{
 		w:         s.w,
-		name:      slot,
+		name:      name,
 		readState: s.readState,
 	}
 }
 
-func (s *Slots) ReadString() (string, error) {
+func (s *slots) ReadString() (string, error) {
 	state, err := s.readState()
 	if err != nil {
 		return "", err
 	}
-	return state.Main, nil
+	return state.Data, nil
 }
 
-type Slot struct {
+type namedSlot struct {
 	w         http.ResponseWriter
 	name      string
 	readState func() (*state, error)
 }
 
-func (s *Slot) ReadString() (string, error) {
+var _ NamedSlot = (*namedSlot)(nil)
+
+func (s *namedSlot) ReadString() (string, error) {
 	state, err := s.readState()
 	if err != nil {
 		return "", err
 	}
-	return state.Others[s.name], nil
+	return state.Named[s.name], nil
 }
 
 type writerTo interface {
 	WriteTo(slot string, p []byte) (n int, err error)
 }
 
-func (s *Slot) WriteString(str string) error {
+func (s *namedSlot) WriteString(str string) error {
 	sw, ok := s.w.(writerTo)
 	if !ok {
 		return fmt.Errorf("slot: responsewriter is not a slot writer")
