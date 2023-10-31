@@ -1,6 +1,7 @@
 package slot_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -77,7 +78,10 @@ func TestBatchMainSlot(t *testing.T) {
 		fmt.Fprintf(w, "<layout>%s</layout>", slot)
 	})
 	handler := slot.Batch(view, frame1, frame2, layout)
-	req := httptest.NewRequest("GET", "/", nil)
+	// TODO: requests should be able to read the post body. We're being too clever
+	// overridding the request body with the pipeline and assuming this will only
+	// be used for GET requests.
+	req := httptest.NewRequest("POST", "/", bytes.NewBufferString(`{"name":"hi"}`))
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	res := rec.Result()
@@ -179,6 +183,42 @@ func TestBatchOtherSlots(t *testing.T) {
 	headers := res.Header
 	is.Equal(headers.Get("aa"), "aa")
 	is.Equal(headers.Get("bb"), "bb")
+}
+
+func TestChainOneHandler(t *testing.T) {
+	is := is.New(t)
+	h1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		is.NoErr(err)
+		w.Write(body)
+	})
+	handler := slot.Chain(h1)
+	req := httptest.NewRequest("POST", "/", bytes.NewBufferString(`{"name":"hi"}`))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	res := rec.Result()
+	is.Equal(res.StatusCode, http.StatusOK)
+	body, err := io.ReadAll(res.Body)
+	is.NoErr(err)
+	is.Equal(string(body), `{"name":"hi"}`)
+}
+
+func TestBatchOneHandler(t *testing.T) {
+	is := is.New(t)
+	h1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		is.NoErr(err)
+		w.Write(body)
+	})
+	handler := slot.Batch(h1)
+	req := httptest.NewRequest("POST", "/", bytes.NewBufferString(`{"name":"hi"}`))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	res := rec.Result()
+	is.Equal(res.StatusCode, http.StatusOK)
+	body, err := io.ReadAll(res.Body)
+	is.NoErr(err)
+	is.Equal(string(body), `{"name":"hi"}`)
 }
 
 func ExampleBatch() {

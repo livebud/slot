@@ -7,6 +7,9 @@ import (
 )
 
 func Chain(handlers ...http.Handler) http.Handler {
+	if len(handlers) == 1 {
+		return handlers[0]
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pipeline := newPipeline(w)
 		for i := 0; i < len(handlers); i++ {
@@ -27,6 +30,9 @@ func Chain(handlers ...http.Handler) http.Handler {
 }
 
 func Batch(handlers ...http.Handler) http.Handler {
+	if len(handlers) == 1 {
+		return handlers[0]
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pipeline := newPipeline(w)
 		eg, ctx := errgroup.WithContext(r.Context())
